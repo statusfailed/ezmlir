@@ -14,21 +14,6 @@ class MLIRConfig:
         self.llc = "llc"
         self.clang = "clang"
 
-def create_matmul_chain_mlir():
-    """Generate MLIR code for matmul chain using string template"""
-    mlir_code = """
-module {
-  func.func @matmul_chain(%arg0: tensor<4x8xf32>, %arg1: tensor<8x16xf32>, %arg2: tensor<16x16xf32>) -> tensor<4x16xf32> {
-    %0 = tensor.empty() : tensor<4x16xf32>
-    %1 = linalg.matmul ins(%arg0, %arg1 : tensor<4x8xf32>, tensor<8x16xf32>) outs(%0 : tensor<4x16xf32>) -> tensor<4x16xf32>
-    %2 = tensor.empty() : tensor<4x16xf32>
-    %3 = linalg.matmul ins(%1, %arg2 : tensor<4x16xf32>, tensor<16x16xf32>) outs(%2 : tensor<4x16xf32>) -> tensor<4x16xf32>
-    return %3 : tensor<4x16xf32>
-  }
-}
-"""
-    return mlir_code.strip()
-
 def optimize_mlir(input_file, output_file, config):
     """Apply optimization passes using mlir-opt"""
     cmd = [
@@ -81,7 +66,8 @@ def run_executable(exe_file):
     return result
 
 def main():
-    parser = argparse.ArgumentParser(description="MLIR matmul chain compiler using LLVM tools")
+    parser = argparse.ArgumentParser(description="MLIR compiler using LLVM tools")
+    parser.add_argument("input", help="Input MLIR file or '-' to read from stdin")
     parser.add_argument("--mlir-opt", default="mlir-opt", help="Path to mlir-opt binary")
     parser.add_argument("--mlir-translate", default="mlir-translate", help="Path to mlir-translate binary")
     parser.add_argument("--llc", default="llc", help="Path to llc binary")
@@ -101,11 +87,15 @@ def main():
     output_dir.mkdir(exist_ok=True)
     
     temp_files = []
+
+    # Read MLIR code from input
+    if args.input == '-':
+        mlir_code = sys.stdin.read()
+    else:
+        with open(args.input, 'r') as f:
+            mlir_code = f.read()
     
     try:
-        # Step 1: Generate initial MLIR
-        print("Generating MLIR code...")
-        mlir_code = create_matmul_chain_mlir()
         
         original_mlir = output_dir / "original.mlir"
         with open(original_mlir, 'w') as f:
