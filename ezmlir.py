@@ -55,17 +55,23 @@ def compile_to_object(llvm_ir_file, obj_file, config):
     cmd = [config.llc, "-filetype=obj", llvm_ir_file, "-o", obj_file]
     subprocess.run(cmd, check=True)
 
+def compile_to_shared_lib(llvm_ir_file, so_file, config):
+    """Compile LLVM IR to shared library using clang"""
+    cmd = [config.clang, "-shared", "-fPIC", llvm_ir_file, "-o", so_file]
+    subprocess.run(cmd, check=True)
+
 
 def main():
     parser = argparse.ArgumentParser(description="MLIR compiler using LLVM tools")
     parser.add_argument("input", help="Input MLIR file or '-' to read from stdin")
-    parser.add_argument("output", help="Output object file name")
+    parser.add_argument("output", help="Output file name (.o for object file, .so for shared library)")
     parser.add_argument("--suffix", default="", help="Suffix for all LLVM binaries (e.g., '-20' for Ubuntu)")
     parser.add_argument("--mlir-opt", help="Path to mlir-opt binary (overrides --suffix)")
     parser.add_argument("--mlir-translate", help="Path to mlir-translate binary (overrides --suffix)")
     parser.add_argument("--llc", help="Path to llc binary (overrides --suffix)")
     parser.add_argument("--clang", help="Path to clang binary (overrides --suffix)")
     parser.add_argument("--temp-dir", help="Directory for temporary files (if not specified, uses system temp)")
+    parser.add_argument("--shared-lib", action="store_true", help="Create shared library (.so) instead of object file (.o)")
 
     args = parser.parse_args()
 
@@ -139,11 +145,16 @@ def main():
         print(llvm_ir[:500] + "..." if len(llvm_ir) > 500 else llvm_ir)
         print()
 
-        # Step 5: Compile to object file
-        print("Compiling to object file...")
-        obj_file = Path(args.output)
-        compile_to_object(str(llvm_ir_file), str(obj_file), config)
-        print(f"Object file generated: {obj_file}")
+        # Step 5: Compile to final output
+        output_file = Path(args.output)
+        if args.shared_lib:
+            print("Compiling to shared library...")
+            compile_to_shared_lib(str(llvm_ir_file), str(output_file), config)
+            print(f"Shared library generated: {output_file}")
+        else:
+            print("Compiling to object file...")
+            compile_to_object(str(llvm_ir_file), str(output_file), config)
+            print(f"Object file generated: {output_file}")
 
     except subprocess.CalledProcessError as e:
         print(f"Error running command: {e}")
