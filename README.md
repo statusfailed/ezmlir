@@ -22,7 +22,7 @@ module {
 
 Then you produce a host binary like this:
 
-    python main.py sample.mlir # add --suffix=-20 to set tool paths to e.g. mlir-opt-20
+    python ezmlir.py sample.mlir # add --suffix=-20 to set tool paths to e.g. mlir-opt-20
 
 then you will have an object file `matmul_chain.o` with a `matmul_chain` symbol in your output.
 
