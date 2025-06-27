@@ -1,8 +1,10 @@
-# EZMLIR
 
-MLIR → Host code. As easy as possible.
 
-![MLIR](./tradeoffer.png)
+<div align="center">
+ <h1>EZMLIR</h1>
+ <p>MLIR → Host code. As easy as possible.</p>
+ <img src="./tradeoffer.png" style="height:25em"/>
+</div>
 
 You provide an MLIR file like this:
 
@@ -31,8 +33,10 @@ You'll need the following MLIR tools in your path:
 
     mlir-opt
     mlir-transform
+    llc
+    clang
 
-On Ubuntu 25.04 you can install these as mlir-20.
+On Ubuntu 25.04 you can install these as mlir-20 and use the `--sufix=-20` flag.
 
 # Compiler Passes
 
