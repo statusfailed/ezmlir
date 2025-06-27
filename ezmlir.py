@@ -59,26 +59,21 @@ def compile_to_object(llvm_ir_file, obj_file, config):
 def main():
     parser = argparse.ArgumentParser(description="MLIR compiler using LLVM tools")
     parser.add_argument("input", help="Input MLIR file or '-' to read from stdin")
+    parser.add_argument("output", help="Output object file name")
     parser.add_argument("--suffix", default="", help="Suffix for all LLVM binaries (e.g., '-20' for Ubuntu)")
     parser.add_argument("--mlir-opt", help="Path to mlir-opt binary (overrides --suffix)")
     parser.add_argument("--mlir-translate", help="Path to mlir-translate binary (overrides --suffix)")
     parser.add_argument("--llc", help="Path to llc binary (overrides --suffix)")
     parser.add_argument("--clang", help="Path to clang binary (overrides --suffix)")
-    parser.add_argument("--keep-temps", action="store_true", help="Keep temporary files")
-    parser.add_argument("--output-dir", default=".", help="Output directory for generated files")
-    
+    parser.add_argument("--temp-dir", help="Directory for temporary files (if not specified, uses system temp)")
+
     args = parser.parse_args()
-    
+
     config = MLIRConfig()
     config.mlir_opt = args.mlir_opt or f"mlir-opt{args.suffix}"
     config.mlir_translate = args.mlir_translate or f"mlir-translate{args.suffix}"
     config.llc = args.llc or f"llc{args.suffix}"
     config.clang = args.clang or f"clang{args.suffix}"
-    
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(exist_ok=True)
-    
-    temp_files = []
 
     # Read MLIR code from input
     if args.input == '-':
@@ -86,53 +81,70 @@ def main():
     else:
         with open(args.input, 'r') as f:
             mlir_code = f.read()
-    
+
+    # Use specified temp dir or create a temporary one
+    if args.temp_dir:
+        temp_dir = Path(args.temp_dir)
+        temp_dir.mkdir(exist_ok=True)
+        temp_context = temp_dir
+        cleanup_temp = False
+    else:
+        temp_context = tempfile.TemporaryDirectory()
+        cleanup_temp = True
+
     try:
-        
-        original_mlir = output_dir / "original.mlir"
+        if cleanup_temp:
+            temp_path = Path(temp_context.name)
+        else:
+            temp_path = temp_context
+
+        print(f"Using temporary directory: {temp_path}")
+
+        # Get base name from output file for intermediate files
+        output_path = Path(args.output)
+        base_name = output_path.stem
+
+        original_mlir = temp_path / "original.mlir"
         with open(original_mlir, 'w') as f:
             f.write(mlir_code)
-        temp_files.append(original_mlir)
-        
+
         print("Original MLIR:")
         print(mlir_code)
         print()
-        
+
         # Step 2: Optimize MLIR
         print("Optimizing MLIR...")
-        optimized_mlir = output_dir / "optimized.mlir"
+        optimized_mlir = temp_path / "optimized.mlir"
         optimize_mlir(str(original_mlir), str(optimized_mlir), config)
-        temp_files.append(optimized_mlir)
-        
+
         with open(optimized_mlir, 'r') as f:
             optimized_code = f.read()
         print("After optimization:")
         print(optimized_code)
         print()
-        
+
         # Step 3: Lower to LLVM dialect
         print("Lowering to LLVM dialect...")
-        lowered_mlir = output_dir / "lowered.mlir"
+        lowered_mlir = temp_path / "lowered.mlir"
         lower_to_llvm_dialect(str(optimized_mlir), str(lowered_mlir), config)
-        temp_files.append(lowered_mlir)
-        
+
         # Step 4: Translate to LLVM IR
         print("Translating to LLVM IR...")
-        llvm_ir_file = output_dir / "matmul_chain.ll"
+        llvm_ir_file = temp_path / f"{base_name}.ll"
         translate_to_llvm_ir(str(lowered_mlir), str(llvm_ir_file), config)
-        
+
         with open(llvm_ir_file, 'r') as f:
             llvm_ir = f.read()
         print("LLVM IR (first 500 chars):")
         print(llvm_ir[:500] + "..." if len(llvm_ir) > 500 else llvm_ir)
         print()
-        
+
         # Step 5: Compile to object file
         print("Compiling to object file...")
-        obj_file = output_dir / "matmul_chain.o"
+        obj_file = Path(args.output)
         compile_to_object(str(llvm_ir_file), str(obj_file), config)
         print(f"Object file generated: {obj_file}")
-        
+
     except subprocess.CalledProcessError as e:
         print(f"Error running command: {e}")
         sys.exit(1)
@@ -140,11 +152,9 @@ def main():
         print(f"Error: {e}")
         sys.exit(1)
     finally:
-        # Cleanup temporary files if requested
-        if not args.keep_temps:
-            for temp_file in temp_files:
-                if temp_file.exists():
-                    temp_file.unlink()
+        # Cleanup temporary directory if we created it
+        if cleanup_temp and hasattr(temp_context, 'cleanup'):
+            temp_context.cleanup()
 
 if __name__ == "__main__":
     main()
