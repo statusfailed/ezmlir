@@ -55,33 +55,25 @@ def compile_to_object(llvm_ir_file, obj_file, config):
     cmd = [config.llc, "-filetype=obj", llvm_ir_file, "-o", obj_file]
     subprocess.run(cmd, check=True)
 
-def create_executable(obj_file, harness_file, exe_file, config):
-    """Link object file with test harness using clang"""
-    cmd = [config.clang, harness_file, obj_file, "-o", exe_file]
-    subprocess.run(cmd, check=True)
-
-def run_executable(exe_file):
-    """Run the generated executable and return output"""
-    result = subprocess.run([f"./{exe_file}"], capture_output=True, text=True)
-    return result
 
 def main():
     parser = argparse.ArgumentParser(description="MLIR compiler using LLVM tools")
     parser.add_argument("input", help="Input MLIR file or '-' to read from stdin")
-    parser.add_argument("--mlir-opt", default="mlir-opt", help="Path to mlir-opt binary")
-    parser.add_argument("--mlir-translate", default="mlir-translate", help="Path to mlir-translate binary")
-    parser.add_argument("--llc", default="llc", help="Path to llc binary")
-    parser.add_argument("--clang", default="clang", help="Path to clang binary")
+    parser.add_argument("--suffix", default="", help="Suffix for all LLVM binaries (e.g., '-20' for Ubuntu)")
+    parser.add_argument("--mlir-opt", help="Path to mlir-opt binary (overrides --suffix)")
+    parser.add_argument("--mlir-translate", help="Path to mlir-translate binary (overrides --suffix)")
+    parser.add_argument("--llc", help="Path to llc binary (overrides --suffix)")
+    parser.add_argument("--clang", help="Path to clang binary (overrides --suffix)")
     parser.add_argument("--keep-temps", action="store_true", help="Keep temporary files")
     parser.add_argument("--output-dir", default=".", help="Output directory for generated files")
     
     args = parser.parse_args()
     
     config = MLIRConfig()
-    config.mlir_opt = args.mlir_opt
-    config.mlir_translate = args.mlir_translate
-    config.llc = args.llc
-    config.clang = args.clang
+    config.mlir_opt = args.mlir_opt or f"mlir-opt{args.suffix}"
+    config.mlir_translate = args.mlir_translate or f"mlir-translate{args.suffix}"
+    config.llc = args.llc or f"llc{args.suffix}"
+    config.clang = args.clang or f"clang{args.suffix}"
     
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
@@ -140,23 +132,6 @@ def main():
         obj_file = output_dir / "matmul_chain.o"
         compile_to_object(str(llvm_ir_file), str(obj_file), config)
         print(f"Object file generated: {obj_file}")
-        
-        # Step 6: Create executable (if test harness exists)
-        harness_file = Path("test_harness.c")
-        if harness_file.exists():
-            print("Creating executable...")
-            exe_file = output_dir / "matmul_test"
-            create_executable(str(obj_file), str(harness_file), str(exe_file), config)
-            print(f"Executable generated: {exe_file}")
-            
-            # Step 7: Run the test
-            print("\nRunning the test:")
-            result = run_executable(str(exe_file))
-            print(result.stdout)
-            if result.stderr:
-                print("Errors:", result.stderr)
-        else:
-            print("Test harness (test_harness.c) not found, skipping executable creation")
         
     except subprocess.CalledProcessError as e:
         print(f"Error running command: {e}")

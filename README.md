@@ -20,11 +20,9 @@ module {
 
 Then you produce a host binary like this:
 
-    ./ezmlir.py myfile.mlir mybinary.o
+    python main.py sample.mlir # add --suffix=-20 to set tool paths to e.g. mlir-opt-20
 
-... which will have the functions in your module as symbols.
-
-That's it.
+then you will have an object file `matmul_chain.o` with a `matmul_chain` symbol in your output.
 
 # Dependencies
 
